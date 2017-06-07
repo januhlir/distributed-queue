@@ -1,5 +1,3 @@
-Please see below the instructions for the coding exercise for State Street:
-
 Requirements
 
 You are to create two small applications for this programming task; one is called Randomizer, the other Prime Randomizer‘s job is to generate a series of positive random integers and send those to Prime via a distributed queue of integers.
