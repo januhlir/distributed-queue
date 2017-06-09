@@ -1,9 +1,12 @@
 package org.github.januhlir.dpnc.queue;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
 
 /**
@@ -19,62 +22,163 @@ import java.util.concurrent.BlockingQueue;
  * @param <OT>
  *            output type
  */
-class ClientProxy<IT, OT> implements Runnable {
-	private final Socket socket;
-	private final DataInputStream in;
-	private final DataOutputStream out;
+class ClientProxy<IT, OT> {
+	private final SocketChannel channel;
 	private final ClientProxyProcess<IT, OT> clientProxyProcess;
 
 	private final BlockingQueue<IT> inputQueue;
 	private final BlockingQueue<OT> outputQueue;
 
 	public ClientProxy(
-			Socket socket, 
+			SocketChannel channel, 
 			ClientProxyProcess<IT, OT> workerProcess,
 			BlockingQueue<IT> inputQueue,
 			BlockingQueue<OT> outputQueue
 			) {
-		this.socket = socket;
-		try {
-			this.in = new DataInputStream(socket.getInputStream());
-			this.out = new DataOutputStream(socket.getOutputStream());
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
+		this.channel = channel;
 		this.inputQueue = inputQueue;
 		this.outputQueue = outputQueue;
 		this.clientProxyProcess = workerProcess;
 	}
 
-	/**
-	 * Take a request from the internal input queue, sends it to
-	 * remote client, waiting for response, when place result to the internal
-	 * output queue.
-	 */
-	public void run() {
-		try {
-			while (true) {
-				try {
-					IT input = inputQueue.take();
-					OT result = clientProxyProcess.process(out, in, input);
-					outputQueue.put(result);
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-					return;
+	// ------------------------------------------
+
+	private boolean unfinishedWrite = false;
+	private boolean unfinishedRead = false;
+
+	private ByteBuffer wBuff;
+	private ByteBuffer rBuff;
+
+	private final byte[] internalReadBuffer = new byte[4 + 1];
+
+	void write() throws InterruptedException {
+		if (!unfinishedWrite) { 
+			IT input = inputQueue.take();
+
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			DataOutputStream out = new DataOutputStream(baos);
+
+			clientProxyProcess.write(out, input);
+
+			try {
+				// TODO: why array wrapping does not work?
+				//wBuff = ByteBuffer.wrap(baos.toByteArray());
+				wBuff = ByteBuffer.allocate(4 + 1);
+				wBuff.clear();
+				for (byte b : baos.toByteArray()) {
+					wBuff.put(b);
 				}
+				wBuff.flip(); // prepare buffer for channel data send out
+
+				channel.write(wBuff);
+				if (!wBuff.hasRemaining()) {
+					unfinishedWrite = false;
+				} else {
+					unfinishedWrite = true;
+				}
+
+			} catch (IOException e) {
+				throw new RuntimeException(e);
 			}
-		} finally {
-			close();
+		} else {
+			// unfinished write from previous IO event
+			// try to finish it now
+			// write buffer remembers position where it ended last time
+			try {
+				int r = channel.write(wBuff);
+				if (r == -1) {
+					unfinishedWrite = false;
+				} else {
+					unfinishedWrite = true;
+				}
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
 		}
 	}
 
-	private void close() {
+	// TODO: refactor!
+	void read() throws InterruptedException {
+		if (!unfinishedRead) {
+			try {
+				byte rFrameSize = readSizeOfTheResponse();
+				if (rFrameSize < 1) {
+					// either channel was closed or no data at all arrived yet
+					unfinishedRead = false;
+					return; 
+				}
+
+				rBuff = ByteBuffer.allocate(rFrameSize);
+				rBuff.clear();  // prepare buffer for channel data receive
+
+				channel.read(rBuff);
+				if (!rBuff.hasRemaining()) {
+					unfinishedRead = false;
+				} else {
+					unfinishedRead = true;
+					return; // if unfinished immediately return to the main loop
+				}
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+
+			rBuff.flip(); // prepare buffer for reading
+			rBuff.get(internalReadBuffer);
+			ByteArrayInputStream bais = new ByteArrayInputStream(internalReadBuffer);
+			DataInputStream in = new DataInputStream(bais);
+
+			OT result = clientProxyProcess.read(in);
+			outputQueue.put(result);
+		} else {
+			// unfinished read from previous IO event
+			// try to finish it now
+			// read buffer remembers position where it ended last time
+			try {
+				channel.read(rBuff);
+				if (!rBuff.hasRemaining()) {
+					unfinishedRead = false;
+				} else {
+					unfinishedRead = true;
+					return; // if unfinished immediately return to the main loop
+				}
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+
+			rBuff.flip(); // prepare buffer for reading
+			rBuff.get(internalReadBuffer);
+			ByteArrayInputStream bais = new ByteArrayInputStream(internalReadBuffer);
+			DataInputStream in = new DataInputStream(bais);
+
+			OT result = clientProxyProcess.read(in);
+			outputQueue.put(result);
+		}	
+	}
+
+	private byte readSizeOfTheResponse() throws IOException {
+		ByteBuffer buff = ByteBuffer.allocate(1);
+		buff.clear();  // prepare buffer for channel data receive
+		int r = channel.read(buff);
+		if (r < 1) {
+			return -1;
+		}
+		buff.flip();
+		return buff.get();
+	}
+
+	void close() {
 		try {
-			socket.close();
-			in.close();
-			out.close();
+			channel.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+
+	public boolean isUnfinishedWrite() {
+		return unfinishedWrite;
+	}
+
+	public boolean isUnfinishedRead() {
+		return unfinishedRead;
 	}
 }

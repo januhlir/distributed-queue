@@ -1,5 +1,6 @@
 package org.github.januhlir.dpnc.queue;
 
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -60,7 +61,16 @@ public abstract class ClientApplication {
 			try {
 				while (true) {
 					try {
-						process(in, out);
+						ByteArrayOutputStream baos = new ByteArrayOutputStream(10);
+						DataOutputStream outBuff = new DataOutputStream(baos);
+						
+						process(in, outBuff);
+						
+						out.writeByte(baos.size()); // send frame size first 
+						out.write(baos.toByteArray());
+						out.flush();
+					} catch (IOException e) {
+						throw new RuntimeException(e);
 					} catch (InterruptedException e) {
 						Thread.currentThread().interrupt();
 						return;

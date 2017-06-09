@@ -5,10 +5,7 @@ import java.io.DataOutputStream;
 
 /**
  * Core, specialised part of server client proxy, {@link ClientProxy}, concerned
- * with encoding and decoding of parameters and waiting for response.
- * 
- * NOTE: ideally this should be split into multiple classes, but for simplicity
- * sake and this assignment I am keeping this in one class.
+ * with encoding and decoding of parameters.
  * 
  * @author Jan.Uhlir
  *
@@ -20,16 +17,23 @@ import java.io.DataOutputStream;
 public interface ClientProxyProcess<IT, OT> {
 
 	/**
-	 * Implementor should encode inputs and place them to output stream, then
-	 * wait for result to appear on the input stream. When appears, decode and
-	 * return in required type.
+	 * Implementor should encode inputs from input stream. Caller will ensure,
+	 * presumably by buffering, that all data frame is ready in full to be
+	 * decoded
 	 * 
 	 * @param out
-	 * @param in
-	 * @throws InterruptedException
+	 * @param input
 	 */
-	OT process(
+	OT read(
+			DataInputStream in);
+	
+	/**
+	 * Implementor should encode outputs and place them to output stream.
+	 * 
+	 * @param out
+	 * @param input
+	 */
+	void write(
 			DataOutputStream out,
-			DataInputStream in,
 			IT input);
 }
