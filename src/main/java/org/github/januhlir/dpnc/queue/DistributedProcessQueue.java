@@ -15,11 +15,9 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
- * Distributed Processing Queue based on simple socket server and one thread per
- * client proxy. This solution is not well suited for very high number of
- * clients, soon threads and connetions resources would run out. To improve
- * this, NIO would have to be used, to lower number of needed threads; and UDP
- * stateless connections.
+ * Distributed Processing Queue based on NIO socket channel enabling to use just
+ * one thread serving all client proxies. This solution is well suited for very
+ * high number of clients.
  * 
  * Technically unlimited number of participating remote clients; they can be
  * added or dropped anytime.
