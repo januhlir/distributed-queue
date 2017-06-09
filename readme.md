@@ -46,20 +46,16 @@ Run `RunTestSetup` class. It starts Randomizer, the server, and 5 Prime clients;
 
 The Randomizer prints results:
 
-	Number 50 is NOT prime number
-	Number 79 is a prime number
-	Number 63 is NOT prime number
-	Number 4 is NOT prime number
-	Number 49 is NOT prime number
-	Number 43 is a prime number
-	Number 9 is NOT prime number
-	Number 66 is NOT prime number
-	Number 3 is a prime number
-	Number 84 is NOT prime number
-	Number 7 is a prime number
-	Number 50 is NOT prime number
-	Number 27 is NOT prime number
-	Number 20 is NOT prime number
+	Number 753033399 is NOT prime number
+	Number 1353014214 is NOT prime number
+	Number 2000357914 is NOT prime number
+	Number 1200589665 is NOT prime number
+	Number 623753449 is NOT prime number
+	Number 761482918 is NOT prime number
+	Number 1133624431 is a prime number
+	Number 1366831444 is NOT prime number
+	Number 177216859 is a prime number
+	Number 1723645887 is NOT prime number
 
 ### Manual Start
 

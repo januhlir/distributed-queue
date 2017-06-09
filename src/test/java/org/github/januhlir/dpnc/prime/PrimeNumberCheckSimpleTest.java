@@ -1,4 +1,4 @@
-package org.github.januhlir.prime;
+package org.github.januhlir.dpnc.prime;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
